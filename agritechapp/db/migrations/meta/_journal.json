@@ -8,6 +8,13 @@
       "when": 1790403670398,
       "tag": "0000_equal_randall_flagg",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790438400000,
+      "tag": "0001_alertes_audio",
+      "breakpoints": true
     }
   ]
 }

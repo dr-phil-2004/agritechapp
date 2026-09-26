@@ -73,6 +73,8 @@ export const alertes = pgTable('alertes', {
   declenchee_par: integer('declenchee_par').references(() => profils.id).notNull(),
   created_at: timestamp('created_at').defaultNow(),
   recommandation: text('recommandation'),
+  audio_url: text('audio_url'),       // Note vocale enregistrée par le conseiller
+  audio_langue: varchar('audio_langue', { length: 10 }), // 'fr' | 'fon' | 'bariba'
 });
 
 // Envois de notifications
