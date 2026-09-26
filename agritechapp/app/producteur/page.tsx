@@ -171,13 +171,14 @@ export default function ProducteurPage() {
             {/* Vendre */}
             <li>
               <button
+                onClick={() => router.push('/producteur/vendre')}
                 className="w-full min-h-[72px] bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white rounded-2xl p-5 flex items-center gap-4 transition-colors focus:outline-none focus:ring-4 focus:ring-purple-300"
-                aria-label="Publier une annonce de vente"
+                aria-label="Voir les annonces d'achat et mes ventes"
               >
                 <ShoppingCart className="w-10 h-10 shrink-0" aria-hidden="true" />
                 <div className="text-left">
                   <div className="text-xl font-bold">Vendre</div>
-                  <div className="text-sm opacity-90">Mes annonces</div>
+                  <div className="text-sm opacity-90">Annonces d&apos;achat et mes ventes</div>
                 </div>
               </button>
             </li>

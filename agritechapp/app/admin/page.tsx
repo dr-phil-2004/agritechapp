@@ -56,14 +56,17 @@ export default function AdminPage() {
           </div>
 
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button className="bg-gray-600 text-white p-4 rounded-lg hover:bg-gray-700 transition-colors">
+            <button className="bg-gray-600 text-white p-4 rounded-lg hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400">
               <div className="font-semibold">Gestion des contenus</div>
               <div className="text-sm opacity-90">Fiches ravageurs, réglementaires</div>
             </button>
-            
-            <button className="bg-gray-600 text-white p-4 rounded-lg hover:bg-gray-700 transition-colors">
-              <div className="font-semibold">Recettes de l'État</div>
-              <div className="text-sm opacity-90">Ventes déclarées</div>
+
+            <button
+              onClick={() => router.push('/admin/recettes')}
+              className="bg-gray-600 text-white p-4 rounded-lg hover:bg-gray-700 transition-colors text-left focus:outline-none focus:ring-2 focus:ring-gray-400"
+            >
+              <div className="font-semibold">Recettes de l&apos;État</div>
+              <div className="text-sm opacity-90">Ventes déclarées et redevances</div>
             </button>
           </div>
         </div>
