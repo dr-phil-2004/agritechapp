@@ -72,6 +72,7 @@ export const alertes = pgTable('alertes', {
   rayon_km: integer('rayon_km').notNull().default(10),
   declenchee_par: integer('declenchee_par').references(() => profils.id).notNull(),
   created_at: timestamp('created_at').defaultNow(),
+  recommandation: text('recommandation'),
 });
 
 // Envois de notifications

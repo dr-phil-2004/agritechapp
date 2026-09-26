@@ -32,6 +32,7 @@ export default function LoginPage() {
       });
       const data = await response.json() as { success: boolean; user?: { role: string }; error?: string };
       if (data.success) {
+        localStorage.setItem('agri_current_user', JSON.stringify(data.user));
         const role = data.user?.role;
         if (role === 'producteur') router.push('/producteur');
         else if (role === 'acheteur') router.push('/acheteur');
@@ -56,6 +57,7 @@ export default function LoginPage() {
       });
       const data = await response.json() as { success: boolean; user?: { role: string }; error?: string };
       if (data.success) {
+        localStorage.setItem('agri_current_user', JSON.stringify(data.user));
         const role = data.user?.role;
         if (role === 'conseiller') router.push('/conseiller');
         else if (role === 'admin') router.push('/admin');

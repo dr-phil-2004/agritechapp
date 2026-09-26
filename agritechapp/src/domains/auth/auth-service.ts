@@ -167,11 +167,12 @@ export class AuthService {
       };
     }
 
-    // Créer l'utilisateur Supabase avec service_role
+    // Créer l'utilisateur Supabase avec service_role (sans email de confirmation)
     const email = phoneToEmail(phone);
-    const { data, error } = await supabaseAdmin.auth.signUp({
+    const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: code,
+      email_confirm: true,
     });
 
     if (error) {
@@ -218,11 +219,12 @@ export class AuthService {
       };
     }
 
-    // Créer l'utilisateur Supabase
+    // Créer l'utilisateur Supabase (sans email de confirmation)
     const email = phoneToEmail(phone);
-    const { data, error } = await supabaseAdmin.auth.signUp({
+    const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: code,
+      email_confirm: true,
     });
 
     if (error) {

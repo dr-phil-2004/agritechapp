@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useEffect, useState, useCallback } from 'react';
 import { Camera, Bell, ShoppingCart, Volume2, CheckCircle, Clock, ArrowLeft } from 'lucide-react';
 
@@ -85,13 +86,15 @@ export default function ProducteurPage() {
         </div>
 
         {/* Bannière statut synchronisation */}
-        <div
+        <Link
+          href={pendingCount > 0 ? '/producteur/file-attente' : '#'}
           role="status"
           aria-live="polite"
+          aria-label={pendingCount > 0 ? `${pendingCount} signalement(s) en attente — voir la file d'attente` : 'Tout synchronisé'}
           className={`mb-4 p-3 rounded-lg flex items-center gap-3 text-sm font-medium ${
             pendingCount > 0
-              ? 'bg-orange-100 text-orange-800 border border-orange-300'
-              : 'bg-green-100 text-green-800 border border-green-300'
+              ? 'bg-orange-100 text-orange-800 border border-orange-300 hover:bg-orange-200 transition-colors'
+              : 'bg-green-100 text-green-800 border border-green-300 pointer-events-none'
           }`}
         >
           {pendingCount > 0 ? (
@@ -108,7 +111,7 @@ export default function ProducteurPage() {
               <span>Tout synchronisé</span>
             </>
           )}
-        </div>
+        </Link>
 
         {/* Bouton Écouter */}
         <button
@@ -153,6 +156,7 @@ export default function ProducteurPage() {
             {/* Alertes */}
             <li>
               <button
+                onClick={() => router.push('/producteur/alertes')}
                 className="w-full min-h-[72px] bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-2xl p-5 flex items-center gap-4 transition-colors focus:outline-none focus:ring-4 focus:ring-blue-300"
                 aria-label="Voir les alertes phytosanitaires"
               >

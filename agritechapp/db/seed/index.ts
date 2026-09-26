@@ -1,6 +1,6 @@
 import { db } from '../index';
 import * as schema from '../schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { supabaseAdmin } from '../../src/infrastructure/supabase/admin-client';
 
 // Graine fixe pour la reproductibilité
@@ -52,48 +52,34 @@ async function createAuthUser(email: string, password: string): Promise<void> {
   }
 }
 
-// Données des communes réelles (limites simplifiées pour le seed)
+// Données des communes — géométrie en WKT (compatible ST_GeomFromText)
+// Note : PostGIS WKT = POLYGON((lng lat, lng lat, ...)) — longitude d'abord
 const communesData = [
   {
     nom: 'N\'Dali',
     departement: 'Borgou',
-    geom: JSON.stringify({
-      type: 'Polygon',
-      coordinates: [[
-        [9.5, 10.0], [9.6, 10.0], [9.6, 10.1], [9.5, 10.1], [9.5, 10.0]
-      ]]
-    })
+    // Coordonnées réelles : N'Dali ~2.75°E, 9.85°N (Borgou, Bénin)
+    geom: 'POLYGON((2.70 9.78, 2.85 9.78, 2.85 9.92, 2.70 9.92, 2.70 9.78))',
+    bbox: { minLng: 2.70, maxLng: 2.85, minLat: 9.78, maxLat: 9.92 },
   },
   {
     nom: 'Parakou',
     departement: 'Borgou',
-    geom: JSON.stringify({
-      type: 'Polygon',
-      coordinates: [[
-        [2.6, 9.3], [2.7, 9.3], [2.7, 9.4], [2.6, 9.4], [2.6, 9.3]
-      ]]
-    })
+    geom: 'POLYGON((2.6 9.3, 2.7 9.3, 2.7 9.4, 2.6 9.4, 2.6 9.3))',
+    bbox: { minLng: 2.6, maxLng: 2.7, minLat: 9.3, maxLat: 9.4 },
   },
   {
     nom: 'Tchaourou',
     departement: 'Borgou',
-    geom: JSON.stringify({
-      type: 'Polygon',
-      coordinates: [[
-        [2.9, 9.7], [3.0, 9.7], [3.0, 9.8], [2.9, 9.8], [2.9, 9.7]
-      ]]
-    })
+    geom: 'POLYGON((2.9 9.7, 3.0 9.7, 3.0 9.8, 2.9 9.8, 2.9 9.7))',
+    bbox: { minLng: 2.9, maxLng: 3.0, minLat: 9.7, maxLat: 9.8 },
   },
   {
     nom: 'Djidja',
     departement: 'Zou',
-    geom: JSON.stringify({
-      type: 'Polygon',
-      coordinates: [[
-        [1.9, 7.4], [2.0, 7.4], [2.0, 7.5], [1.9, 7.5], [1.9, 7.4]
-      ]]
-    })
-  }
+    geom: 'POLYGON((1.9 7.4, 2.0 7.4, 2.0 7.5, 1.9 7.5, 1.9 7.4))',
+    bbox: { minLng: 1.9, maxLng: 2.0, minLat: 7.4, maxLat: 7.5 },
+  },
 ];
 
 // Ravageurs du § 7
@@ -138,21 +124,28 @@ const villagesTchaourou = ['Bembéréké', 'Tchaourou-centre', 'Kpinnou', 'Oké'
 // Noms de famille courants dans la zone
 const nomsFamille = ['Kouagou', 'Sanni', 'Yao', 'Aïssé', 'Koudjo', 'Toko', 'Gnanvi', 'Koffi', 'Adé', 'Moutawakilou'];
 
-function randomPointInPolygon(polygon: { coordinates: number[][][] }) {
-  const coords = polygon.coordinates[0];
-  const minLng = Math.min(...coords.map((c) => c[0]));
-  const maxLng = Math.max(...coords.map((c) => c[0]));
-  const minLat = Math.min(...coords.map((c) => c[1]));
-  const maxLat = Math.max(...coords.map((c) => c[1]));
-
-  const lng = minLng + random() * (maxLng - minLng);
-  const lat = minLat + random() * (maxLat - minLat);
-
-  return JSON.stringify({ type: 'Point', coordinates: [lng, lat] });
+function randomPointInBbox(bbox: { minLng: number; maxLng: number; minLat: number; maxLat: number }) {
+  const lng = bbox.minLng + random() * (bbox.maxLng - bbox.minLng);
+  const lat = bbox.minLat + random() * (bbox.maxLat - bbox.minLat);
+  // WKT Point format compatible with ST_GeomFromText
+  return `POINT(${lng} ${lat})`;
 }
 
 async function seed() {
   console.log('Début du seed...');
+
+  // ── 0. Nettoyage des tables (pour un seed reproductible) ─────────────────────
+  console.log('Nettoyage des tables...');
+  await db.execute(sql`TRUNCATE TABLE envois, alertes, signalements, annonces, ventes_declarees, contenus_audio, contenus, profils, ravageurs, communes RESTART IDENTITY CASCADE`);
+
+  // ── 0b. Buckets Supabase Storage ──────────────────────────────────────────────
+  console.log('Création des buckets Storage...');
+  for (const bucketId of ['photos', 'notes-vocales']) {
+    const { error } = await supabaseAdmin.storage.createBucket(bucketId, { public: true });
+    if (error && !error.message.includes('already exists')) {
+      console.warn(`Bucket ${bucketId}: ${error.message}`);
+    }
+  }
 
   // ── 1. Comptes Supabase Auth ────────────────────────────────────────────────
   console.log('Création des comptes Supabase Auth...');
@@ -166,7 +159,10 @@ async function seed() {
 
   // ── 2. Communes ──────────────────────────────────────────────────────────────
   console.log('Insertion des communes...');
-  const insertedCommunes = await db.insert(schema.communes).values(communesData).returning();
+  // Strip the 'bbox' helper field before inserting into DB
+  const insertedCommunes = await db.insert(schema.communes).values(
+    communesData.map(({ nom, departement, geom }) => ({ nom, departement, geom }))
+  ).returning();
   const communeMap = new Map(insertedCommunes.map(c => [c.nom, c.id]));
 
   // ── 3. Ravageurs ──────────────────────────────────────────────────────────────
@@ -176,8 +172,9 @@ async function seed() {
   // ── 4. Personas principaux ───────────────────────────────────────────────────
   console.log('Création des personas...');
 
-  // Bio — producteur smartphone, N'Dali
-  const bioPosition = randomPointInPolygon(JSON.parse(communesData[0].geom));
+  // Bio — producteur smartphone, N'Dali, près d'Adjara et des coordonnées de démo (2.73, 9.85)
+  // Position fixe pour garantir que Bio est dans le rayon de 10 km lors de la démo
+  const bioPosition = 'POINT(2.76 9.86)';
   const bio = await db.insert(schema.profils).values({
     role: 'producteur',
     nom: 'Bio Kouagou',
@@ -189,7 +186,7 @@ async function seed() {
   }).returning();
 
   // Adjara — producteur téléphone basique, près de N'Dali
-  const adjaraPosition = JSON.stringify({ type: 'Point', coordinates: [9.55, 10.05] });
+  const adjaraPosition = 'POINT(2.77 9.87)'; // N'Dali, coordonnées réelles
   await db.insert(schema.profils).values({
     role: 'producteur',
     nom: 'Adjara Sanni',
@@ -203,7 +200,7 @@ async function seed() {
   // Serge — conseiller à Parakou
   // Note : pour les conseillers/admins, on stocke l'email dans le champ telephone
   // car loginWithEmailPassword fait la recherche par ce champ.
-  const sergePosition = randomPointInPolygon(JSON.parse(communesData[1].geom));
+  const sergePosition = randomPointInBbox(communesData[1].bbox);
   const serge = await db.insert(schema.profils).values({
     role: 'conseiller',
     nom: 'Serge Yao',
@@ -215,7 +212,7 @@ async function seed() {
   }).returning();
 
   // Mme Houénou — acheteur à Parakou
-  const acheteusePosition = randomPointInPolygon(JSON.parse(communesData[1].geom));
+  const acheteusePosition = randomPointInBbox(communesData[1].bbox);
   const acheteuse = await db.insert(schema.profils).values({
     role: 'acheteur',
     nom: 'Mme Houénou',
@@ -256,9 +253,7 @@ async function seed() {
       const village = villages[Math.floor(random() * villages.length)];
       const nomFamille = nomsFamille[Math.floor(random() * nomsFamille.length)];
 
-      const position = randomPointInPolygon(JSON.parse(
-        communesData.find(c => c.nom === communeNom)!.geom
-      ));
+      const position = randomPointInBbox(communesData.find(c => c.nom === communeNom)!.bbox);
 
       await db.insert(schema.profils).values({
         role: 'producteur',
@@ -290,7 +285,7 @@ async function seed() {
 
     if (producteur.length === 0) continue;
 
-    const position = randomPointInPolygon(JSON.parse(communesData[0].geom));
+    const position = randomPointInBbox(communesData[0].bbox);
 
     const signalement = await db.insert(schema.signalements).values({
       producteur_id: producteur[0].id,

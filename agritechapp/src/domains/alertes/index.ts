@@ -31,7 +31,8 @@ type ProducerRow = {
  */
 export async function triggerZoneAlert(
   signalementId: number,
-  conseillerId: number
+  conseillerId: number,
+  recommandation?: string
 ): Promise<AlertResult> {
   // 1. Charger le signalement
   const [sig] = await db
@@ -44,15 +45,15 @@ export async function triggerZoneAlert(
   }
 
   // 2. Producteurs dans le rayon via PostGIS ST_DWithin
-  // Position stockée en GeoJSON text → ST_GeomFromGeoJSON
+  // Position stockée en WKT text → ST_GeomFromText
   const rows = await db.execute<ProducerRow>(sql`
     SELECT id, nom, telephone, langue, a_smartphone
     FROM profils
     WHERE role = 'producteur'
       AND position IS NOT NULL
       AND ST_DWithin(
-        ST_GeomFromGeoJSON(position)::geography,
-        ST_GeomFromGeoJSON(${sig.position})::geography,
+        ST_GeomFromText(position, 4326)::geography,
+        ST_GeomFromText(${sig.position}, 4326)::geography,
         ${RAYON_M}
       )
   `);
@@ -64,6 +65,7 @@ export async function triggerZoneAlert(
       signalement_id: signalementId,
       rayon_km: RAYON_KM,
       declenchee_par: conseillerId,
+      recommandation: recommandation ?? null,
     })
     .returning();
 
