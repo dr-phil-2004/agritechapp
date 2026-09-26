@@ -84,6 +84,7 @@ export const envois = pgTable('envois', {
   langue: text('langue').notNull(),
   statut: text('statut').notNull().default('envoye'), // 'envoye', 'echoue', 'delivre'
   sent_at: timestamp('sent_at').defaultNow(),
+  vu_at: timestamp('vu_at'), // null = pas encore consulté par le producteur
 });
 
 // Contenus (fiches ravageurs, réglementaires)
