@@ -19,6 +19,26 @@ import {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+interface SuiviRow {
+  envoi_id: number;
+  destinataire_id: number;
+  nom: string;
+  telephone: string;
+  canal: string;
+  langue: string;
+  statut: string;
+  sent_at: string | null;
+  vu_at: string | null;
+}
+
+interface SuiviData {
+  alerte_id: number;
+  total: number;
+  recu: SuiviRow[];
+  vu: SuiviRow[];
+  echec: SuiviRow[];
+}
+
 interface SignalementRecord {
   id: number;
   producteur_id: number;
@@ -152,8 +172,29 @@ function QualificationPanel({
   const [recommandation, setRecommandation] = useState('');
   const [loading, setLoading] = useState(false);
   const [alertResult, setAlertResult] = useState<string | null>(null);
+  const [suivi, setSuivi] = useState<SuiviData | null>(null);
+  const [suiviLoading, setSuiviLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const suiviIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Nettoyage du polling au démontage
+  useEffect(() => {
+    return () => {
+      if (suiviIntervalRef.current) clearInterval(suiviIntervalRef.current);
+    };
+  }, []);
+
+  const chargerSuivi = async (alerteId: number) => {
+    setSuiviLoading(true);
+    try {
+      const res = await fetch(`/api/alertes/${alerteId}/suivi`);
+      const data = await res.json() as { success: boolean } & SuiviData;
+      if (data.success) setSuivi(data);
+    } finally {
+      setSuiviLoading(false);
+    }
+  };
 
   // ── Note vocale du conseiller ────────────────────────────────────────────────
   const [audioLangue, setAudioLangue] = useState<'fr' | 'fon' | 'bariba'>('fr');
@@ -277,10 +318,14 @@ function QualificationPanel({
           audio_langue: uploadedAudioUrl ? audioLangue : undefined,
         }),
       });
-      const alertData = await alertRes.json() as { success: boolean; producers_notified?: number };
+      const alertData = await alertRes.json() as { success: boolean; producers_notified?: number; alerte_id?: number };
       if (alertData.success) {
         setAlertResult(`Alerte envoyée à ${alertData.producers_notified ?? 0} producteur(s) dans un rayon de 10 km.`);
-        setTimeout(() => { onSuccess(); }, 2500);
+        // Charger le suivi immédiatement puis toutes les 10s
+        if (alertData.alerte_id) {
+          chargerSuivi(alertData.alerte_id);
+          suiviIntervalRef.current = setInterval(() => chargerSuivi(alertData.alerte_id!), 10_000);
+        }
       } else {
         throw new Error('Erreur lors du déclenchement de l\'alerte');
       }
@@ -365,11 +410,102 @@ function QualificationPanel({
           </div>
         )}
 
-        {/* Déjà alerté ? */}
+        {/* Résultat de l'alerte + suivi */}
         {alertResult && (
-          <div role="status" className="p-3 bg-green-50 border border-green-200 rounded-xl flex items-center gap-2 text-green-800 text-sm">
-            <CheckCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
-            {alertResult}
+          <div className="space-y-3">
+            <div role="status" className="p-3 bg-green-50 border border-green-200 rounded-xl flex items-center gap-2 text-green-800 text-sm">
+              <CheckCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
+              {alertResult}
+            </div>
+
+            {/* Tableau de suivi */}
+            {suiviLoading && !suivi && (
+              <div className="text-center text-xs text-gray-400 py-2" role="status">Chargement du suivi…</div>
+            )}
+            {suivi && (
+              <div className="border border-gray-100 rounded-xl overflow-hidden text-sm">
+                {/* En-tête */}
+                <div className="bg-gray-50 px-3 py-2 flex items-center justify-between border-b border-gray-100">
+                  <span className="font-semibold text-gray-700">Suivi des notifications</span>
+                  <div className="flex gap-2 text-xs">
+                    <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-medium">
+                      {suivi.vu.length} vu{suivi.vu.length > 1 ? 's' : ''}
+                    </span>
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">
+                      {suivi.recu.length} reçu{suivi.recu.length > 1 ? 's' : ''}
+                    </span>
+                    {suivi.echec.length > 0 && (
+                      <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-medium">
+                        {suivi.echec.length} échec
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Section Vus */}
+                {suivi.vu.length > 0 && (
+                  <details open className="border-b border-gray-100">
+                    <summary className="px-3 py-2 cursor-pointer select-none flex items-center gap-2 text-green-700 font-medium hover:bg-green-50">
+                      <span aria-hidden="true">✅</span> Consulté ({suivi.vu.length})
+                    </summary>
+                    <ul className="divide-y divide-gray-50">
+                      {suivi.vu.map((r) => (
+                        <li key={r.envoi_id} className="px-3 py-2 flex items-center justify-between gap-2">
+                          <span className="font-medium text-gray-800 truncate">{r.nom}</span>
+                          <span className="text-xs text-gray-400 shrink-0">
+                            {r.canal === 'sms' ? '📱' : '📞'} {r.vu_at ? new Date(r.vu_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+
+                {/* Section Reçus non lus */}
+                {suivi.recu.length > 0 && (
+                  <details open className="border-b border-gray-100">
+                    <summary className="px-3 py-2 cursor-pointer select-none flex items-center gap-2 text-blue-700 font-medium hover:bg-blue-50">
+                      <span aria-hidden="true">📨</span> Reçu, pas encore consulté ({suivi.recu.length})
+                    </summary>
+                    <ul className="divide-y divide-gray-50">
+                      {suivi.recu.map((r) => (
+                        <li key={r.envoi_id} className="px-3 py-2 flex items-center justify-between gap-2">
+                          <span className="font-medium text-gray-800 truncate">{r.nom}</span>
+                          <span className="text-xs text-gray-400 shrink-0">
+                            {r.canal === 'sms' ? '📱 SMS' : '📞 Appel'}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+
+                {/* Section Échecs */}
+                {suivi.echec.length > 0 && (
+                  <details>
+                    <summary className="px-3 py-2 cursor-pointer select-none flex items-center gap-2 text-red-600 font-medium hover:bg-red-50">
+                      <span aria-hidden="true">❌</span> Échec d'envoi ({suivi.echec.length})
+                    </summary>
+                    <ul className="divide-y divide-gray-50">
+                      {suivi.echec.map((r) => (
+                        <li key={r.envoi_id} className="px-3 py-2 flex items-center justify-between gap-2">
+                          <span className="font-medium text-gray-800 truncate">{r.nom}</span>
+                          <span className="text-xs text-gray-400 shrink-0">{r.telephone}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+
+                {suivi.total === 0 && (
+                  <p className="px-3 py-3 text-xs text-gray-400 text-center">Aucun producteur dans le rayon.</p>
+                )}
+
+                <p className="px-3 py-1.5 text-xs text-gray-400 text-right border-t border-gray-50">
+                  Mis à jour toutes les 10s
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -561,6 +697,7 @@ export default function CartePage() {
   const [loading, setLoading] = useState(true);
   const [activeView, setActiveView] = useState<'carte' | 'liste'>('carte');
   const [selected, setSelected] = useState<SignalementRecord | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const fetchSignalements = useCallback(async () => {
     setLoading(true);
@@ -599,6 +736,21 @@ export default function CartePage() {
   const handleSelect = useCallback((sig: SignalementRecord) => {
     setSelected(sig);
   }, []);
+
+  const handleSupprimer = async (sigId: number) => {
+    if (!window.confirm('Supprimer ce signalement et ses alertes associées ?')) return;
+    setDeletingId(sigId);
+    try {
+      const res = await fetch(`/api/signalements/${sigId}`, { method: 'DELETE' });
+      const data = await res.json() as { success: boolean };
+      if (data.success) {
+        setSignalements((prev) => prev.filter((s) => s.id !== sigId));
+        if (selected?.id === sigId) setSelected(null);
+      }
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const handlePanelClose = () => setSelected(null);
   const handlePanelSuccess = () => { setSelected(null); fetchSignalements(); };
@@ -653,29 +805,41 @@ export default function CartePage() {
             ) : (
               <ul role="list" aria-label="Liste des signalements" className="space-y-3 mt-4">
                 {signalements.map((sig) => (
-                  <li key={sig.id}>
-                    <button
-                      onClick={() => { setSelected(sig); setActiveView('carte'); }}
-                      className="w-full bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow text-left focus:outline-none focus:ring-2 focus:ring-green-400"
-                      aria-label={`Signalement ${sig.id}, ${getGraviteLabel(sig.gravite)}, ${formatDate(sig.created_at)}`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1">
-                          <p className="font-semibold text-gray-800 text-sm">Signalement #{sig.id}</p>
-                          <p className="text-gray-500 text-xs mt-0.5">{formatDate(sig.created_at)}</p>
-                          <div className="flex gap-2 mt-2">
-                            {sig.photo_url && <span className="text-xs text-blue-600">📷 Photo</span>}
-                            {sig.audio_url && <span className="text-xs text-green-600">🔊 Note vocale</span>}
+                  <li key={sig.id} className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-stretch">
+                      {/* Zone cliquable principale */}
+                      <button
+                        onClick={() => { setSelected(sig); setActiveView('carte'); }}
+                        className="flex-1 p-4 text-left focus:outline-none focus:ring-2 focus:ring-green-400 rounded-l-2xl"
+                        aria-label={`Signalement ${sig.id}, ${getGraviteLabel(sig.gravite)}, ${formatDate(sig.created_at)}`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            <p className="font-semibold text-gray-800 text-sm">Signalement #{sig.id}</p>
+                            <p className="text-gray-500 text-xs mt-0.5">{formatDate(sig.created_at)}</p>
+                            <div className="flex gap-2 mt-2">
+                              {sig.photo_url && <span className="text-xs text-blue-600">📷 Photo</span>}
+                              {sig.audio_url && <span className="text-xs text-green-600">🔊 Note vocale</span>}
+                            </div>
                           </div>
+                          <span
+                            className="px-2 py-1 rounded-full text-white text-xs font-semibold shrink-0"
+                            style={{ backgroundColor: getGraviteColor(sig.gravite) }}
+                          >
+                            {getGraviteLabel(sig.gravite)}
+                          </span>
                         </div>
-                        <span
-                          className="px-2 py-1 rounded-full text-white text-xs font-semibold shrink-0"
-                          style={{ backgroundColor: getGraviteColor(sig.gravite) }}
-                        >
-                          {getGraviteLabel(sig.gravite)}
-                        </span>
-                      </div>
-                    </button>
+                      </button>
+                      {/* Bouton supprimer */}
+                      <button
+                        onClick={() => handleSupprimer(sig.id)}
+                        disabled={deletingId === sig.id}
+                        className="px-3 flex items-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-r-2xl border-l border-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-red-400 disabled:opacity-40"
+                        aria-label={`Supprimer le signalement ${sig.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" aria-hidden="true" />
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
