@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-// Normalise un numéro béninois : 8 chiffres → préfixe 229
+// Normalise un numéro béninois : format 01XXXXXXXX (10 chiffres)
+// Accepte aussi l'ancien format 8 chiffres en ajoutant le préfixe 01
 function normalizePhone(input: string): string {
   const digits = input.replace(/\D/g, '');
-  if (digits.length === 8) return `229${digits}`;
+  if (digits.length === 8) return `01${digits}`;
   return digits;
 }
 
@@ -107,13 +108,13 @@ export default function LoginPage() {
                 <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
                   Numéro de téléphone
                 </label>
-                <p className="text-xs text-gray-400 mb-2">8 chiffres — sans le +229 (ex : 97 00 00 00)</p>
+                <p className="text-xs text-gray-400 mb-2">10 chiffres (ex : 01 97 00 00 00)</p>
                 <input
                   type="tel"
                   id="phone"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="97 XX XX XX"
+                  placeholder="01 XX XX XX XX"
                   inputMode="numeric"
                   autoComplete="tel"
                   className="w-full px-4 py-4 text-2xl tracking-widest text-center border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
@@ -165,7 +166,7 @@ export default function LoginPage() {
               </div>
 
               <button
-                type="submit" disabled={isLoading || phone.replace(/\D/g,'').length < 8 || code.length < 6}
+                type="submit" disabled={isLoading || phone.replace(/\D/g,'').length < 10 || code.length < 6}
                 className="w-full bg-green-600 text-white py-4 rounded-xl font-semibold text-lg hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-4 focus:ring-green-300"
               >
                 {isLoading ? 'Connexion…' : 'Se connecter'}
