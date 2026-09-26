@@ -23,6 +23,8 @@ export async function GET(request: NextRequest) {
         alerte_created_at: alertes.created_at,
         rayon_km: alertes.rayon_km,
         recommandation: alertes.recommandation,
+        audio_url: alertes.audio_url,
+        audio_langue: alertes.audio_langue,
         signalement_id: signalements.id,
         signalement_statut: signalements.statut,
         gravite: signalements.gravite,

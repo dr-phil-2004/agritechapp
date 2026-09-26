@@ -12,6 +12,9 @@ import {
   CheckCircle,
   X,
   Send,
+  Mic,
+  Square,
+  Trash2,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -152,6 +155,80 @@ function QualificationPanel({
   const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // ── Note vocale du conseiller ────────────────────────────────────────────────
+  const [audioLangue, setAudioLangue] = useState<'fr' | 'fon' | 'bariba'>('fr');
+  const [recording, setRecording] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioBlobUrl, setAudioBlobUrl] = useState<string | null>(null);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioBlobUrlRef = useRef<string | null>(null);
+  const unmountedRef = useRef(false);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (unmountedRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      streamRef.current = stream;
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : 'audio/webm';
+      const mr = new MediaRecorder(stream, { mimeType });
+      chunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      mr.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        if (unmountedRef.current) return;
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        audioBlobUrlRef.current = url;
+        setAudioBlob(blob);
+        setAudioBlobUrl(url);
+      };
+      mediaRecorderRef.current = mr;
+      mr.start(200);
+      setRecording(true);
+      setRecordingSeconds(0);
+      timerRef.current = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+    } catch {
+      setError('Impossible d\'accéder au microphone');
+    }
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    if (timerRef.current) clearInterval(timerRef.current);
+    setRecording(false);
+  };
+
+  const deleteRecording = () => {
+    if (audioBlobUrlRef.current) URL.revokeObjectURL(audioBlobUrlRef.current);
+    audioBlobUrlRef.current = null;
+    setAudioBlob(null);
+    setAudioBlobUrl(null);
+    setRecordingSeconds(0);
+  };
+
+  useEffect(() => {
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop();
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      if (audioBlobUrlRef.current) URL.revokeObjectURL(audioBlobUrlRef.current);
+      audioBlobUrlRef.current = null;
+    };
+  }, []);
+
   const handleConfirmer = async () => {
     setLoading(true); setError(null);
     try {
@@ -170,11 +247,35 @@ function QualificationPanel({
         if (!patchRes.ok) throw new Error('Erreur lors de la confirmation');
       }
 
-      // 2. Déclencher l'alerte de zone
+      // 2. Uploader la note vocale si présente
+      let uploadedAudioUrl: string | undefined;
+      if (audioBlob) {
+        const fd = new FormData();
+        fd.append('audio', audioBlob, `note-${Date.now()}.webm`);
+        fd.append('langue', audioLangue);
+        const uploadRes = await fetch('/api/upload/audio-conseil', { method: 'POST', body: fd });
+        const uploadData = await uploadRes.json().catch(() => null) as { success?: boolean; url?: string; error?: string } | null;
+        if (!uploadRes.ok || !uploadData?.success || !uploadData.url) {
+          throw new Error(
+            uploadData?.error
+              ? `Envoi de la note vocale impossible : ${uploadData.error}`
+              : 'Envoi de la note vocale impossible. Réessayez ou supprimez l\'enregistrement.'
+          );
+        }
+        uploadedAudioUrl = uploadData.url;
+      }
+
+      // 3. Déclencher l'alerte de zone
       const alertRes = await fetch('/api/alertes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ signalement_id: sig.id, conseiller_id: 1, recommandation: recommandation || undefined }),
+        body: JSON.stringify({
+          signalement_id: sig.id,
+          conseiller_id: 1,
+          recommandation: recommandation || undefined,
+          audio_url: uploadedAudioUrl,
+          audio_langue: uploadedAudioUrl ? audioLangue : undefined,
+        }),
       });
       const alertData = await alertRes.json() as { success: boolean; producers_notified?: number };
       if (alertData.success) {
@@ -315,7 +416,7 @@ function QualificationPanel({
             </div>
 
             <div>
-              <label htmlFor="recommandation" className="block text-xs text-gray-500 mb-1">Recommandation (optionnel)</label>
+              <label htmlFor="recommandation" className="block text-xs text-gray-500 mb-1">Recommandation écrite (optionnel)</label>
               <textarea
                 id="recommandation"
                 value={recommandation}
@@ -325,6 +426,81 @@ function QualificationPanel({
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm resize-none focus:ring-2 focus:ring-green-400 focus:border-transparent"
                 maxLength={500}
               />
+            </div>
+
+            {/* ── Note vocale du conseiller ── */}
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-3">
+              <p className="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
+                <Mic className="w-3.5 h-3.5" aria-hidden="true" />
+                Note vocale pour les producteurs (optionnel)
+              </p>
+
+              {/* Sélecteur de langue */}
+              <div>
+                <label htmlFor="audio-langue" className="block text-xs text-gray-500 mb-1">Langue de l'enregistrement</label>
+                <select
+                  id="audio-langue"
+                  value={audioLangue}
+                  onChange={(e) => setAudioLangue(e.target.value as 'fr' | 'fon' | 'bariba')}
+                  className="w-full px-3 py-2 border border-amber-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+                >
+                  <option value="fr">Français</option>
+                  <option value="fon">Fon</option>
+                  <option value="bariba">Bariba</option>
+                </select>
+              </div>
+
+              {/* Boutons enregistrement */}
+              {!audioBlobUrl ? (
+                <button
+                  type="button"
+                  onClick={recording ? stopRecording : startRecording}
+                  className={`w-full min-h-[44px] rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400 ${
+                    recording
+                      ? 'bg-red-600 hover:bg-red-700 text-white'
+                      : 'bg-amber-500 hover:bg-amber-600 text-white'
+                  }`}
+                  aria-label={recording ? 'Arrêter l\'enregistrement' : 'Démarrer l\'enregistrement vocal'}
+                >
+                  {recording ? (
+                    <>
+                      <Square className="w-4 h-4" aria-hidden="true" />
+                      Arrêter ({recordingSeconds}s)
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="w-4 h-4" aria-hidden="true" />
+                      Enregistrer un message vocal
+                    </>
+                  )}
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  {/* Prévisualisation */}
+                  {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                  <audio
+                    src={audioBlobUrl}
+                    controls
+                    className="w-full h-10"
+                    aria-label={`Note vocale enregistrée en ${audioLangue}`}
+                  />
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <CheckCircle className="w-3.5 h-3.5 text-green-600" aria-hidden="true" />
+                      Enregistré ({recordingSeconds}s) · {audioLangue}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={deleteRecording}
+                      className="flex items-center gap-1 text-red-500 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-red-400 rounded px-1"
+                      aria-label="Supprimer l'enregistrement"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                      Supprimer
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3 pt-1">

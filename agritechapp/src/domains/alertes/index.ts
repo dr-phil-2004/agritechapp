@@ -32,7 +32,9 @@ type ProducerRow = {
 export async function triggerZoneAlert(
   signalementId: number,
   conseillerId: number,
-  recommandation?: string
+  recommandation?: string,
+  audioUrl?: string,
+  audioLangue?: string
 ): Promise<AlertResult> {
   // 1. Charger le signalement
   const [sig] = await db
@@ -66,6 +68,8 @@ export async function triggerZoneAlert(
       rayon_km: RAYON_KM,
       declenchee_par: conseillerId,
       recommandation: recommandation ?? null,
+      audio_url: audioUrl ?? null,
+      audio_langue: audioLangue ?? null,
     })
     .returning();
 
@@ -82,11 +86,17 @@ export async function triggerZoneAlert(
 
     let statutEnvoi: 'envoye' | 'echoue' = 'echoue';
 
+    // Utiliser la note vocale du conseiller si disponible et dans la bonne langue,
+    // sinon fallback sur l'audio générique
+    const callAudioUrl = (audioUrl && (!audioLangue || audioLangue === langue || audioLangue === 'fr'))
+      ? audioUrl
+      : audioFallback;
+
     try {
       if (producer.a_smartphone) {
         await gateway.sendSms(producer.telephone, message);
       } else {
-        await gateway.placeVoiceCall(producer.telephone, audioFallback, langue);
+        await gateway.placeVoiceCall(producer.telephone, callAudioUrl, langue);
       }
       statutEnvoi = 'envoye';
       producersNotified++;
