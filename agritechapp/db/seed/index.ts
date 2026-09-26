@@ -22,16 +22,16 @@ const random = seededRandom(SEED);
 //  Producteurs/acheteurs  →  numéro + code à 6 chiffres
 //  Conseiller/admin       →  email + mot de passe
 //
-//  Bio (producteur)    : 22941000001 / 123456
-//  Adjara (producteur) : 22941000002 / 000000
-//  Mme Houénou (ach.)  : 22941000003 / 123456
+//  Bio (producteur)    : 0141000001 / 123456
+//  Adjara (producteur) : 0141000002 / 000000
+//  Mme Houénou (ach.)  : 0141000003 / 123456
 //  Serge (conseiller)  : serge@agriveille.bj / Conseil1
 //  Admin               : admin@agriveille.bj / Admin2026
 //
 const PERSONAS = [
-  { phone: '22941000001', code: '123456', role: 'producteur' as const },
-  { phone: '22941000002', code: '000000', role: 'producteur' as const },
-  { phone: '22941000003', code: '123456', role: 'acheteur' as const },
+  { phone: '0141000001', code: '123456', role: 'producteur' as const },
+  { phone: '0141000002', code: '000000', role: 'producteur' as const },
+  { phone: '0141000003', code: '123456', role: 'acheteur' as const },
   { email: 'serge@agriveille.bj', password: 'Conseil1', role: 'conseiller' as const },
   { email: 'admin@agriveille.bj', password: 'Admin2026', role: 'admin' as const },
 ];
@@ -40,14 +40,40 @@ function phoneToEmail(phone: string): string {
   return `${phone.replace(/[^0-9]/g, '')}@agri.bj`;
 }
 
-// Créer (ou ignorer si déjà existant) un compte Supabase Auth
+// Cache des utilisateurs Supabase Auth (chargé une seule fois si nécessaire)
+let _existingUsers: { id: string; email?: string }[] | null = null;
+
+async function getExistingUsers() {
+  if (!_existingUsers) {
+    const { data } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+    _existingUsers = data.users;
+  }
+  return _existingUsers;
+}
+
+// Créer ou mettre à jour un compte Supabase Auth (pour un seed toujours reproductible)
 async function createAuthUser(email: string, password: string): Promise<void> {
   const { error } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
   });
-  if (error && !error.message.includes('already')) {
+
+  if (!error) return;
+
+  if (error.message.toLowerCase().includes('already')) {
+    const users = await getExistingUsers();
+    const existing = users.find((u) => u.email === email);
+    if (existing) {
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        existing.id,
+        { password, email_confirm: true }
+      );
+      if (updateError) {
+        console.warn(`Auth user update ${email}: ${updateError.message}`);
+      }
+    }
+  } else {
     console.warn(`Auth user ${email}: ${error.message}`);
   }
 }
@@ -178,7 +204,7 @@ async function seed() {
   const bio = await db.insert(schema.profils).values({
     role: 'producteur',
     nom: 'Bio Kouagou',
-    telephone: '22941000001',
+    telephone: '0141000001',
     langue: 'bariba',
     a_smartphone: true,
     commune_id: communeMap.get('N\'Dali'),
@@ -190,7 +216,7 @@ async function seed() {
   await db.insert(schema.profils).values({
     role: 'producteur',
     nom: 'Adjara Sanni',
-    telephone: '22941000002',
+    telephone: '0141000002',
     langue: 'bariba',
     a_smartphone: false,
     commune_id: communeMap.get('N\'Dali'),
@@ -216,7 +242,7 @@ async function seed() {
   const acheteuse = await db.insert(schema.profils).values({
     role: 'acheteur',
     nom: 'Mme Houénou',
-    telephone: '22941000003',
+    telephone: '0141000003',
     langue: 'fr',
     a_smartphone: true,
     commune_id: communeMap.get('Parakou'),
@@ -369,9 +395,9 @@ async function seed() {
   console.log('┌─ IDENTIFIANTS DE CONNEXION ─────────────────────────────────┐');
   console.log('│ Persona        │ Identifiant          │ Mot de passe / Code │');
   console.log('├────────────────┼──────────────────────┼─────────────────────┤');
-  console.log('│ Bio (prod.)    │ 22941000001           │ 123456              │');
-  console.log('│ Adjara (prod.) │ 22941000002           │ 000000              │');
-  console.log('│ Mme Houénou    │ 22941000003           │ 123456              │');
+  console.log('│ Bio (prod.)    │ 0141000001            │ 123456              │');
+  console.log('│ Adjara (prod.) │ 0141000002            │ 000000              │');
+  console.log('│ Mme Houénou    │ 0141000003            │ 123456              │');
   console.log('│ Serge          │ serge@agriveille.bj   │ Conseil1            │');
   console.log('│ Admin          │ admin@agriveille.bj   │ Admin2026           │');
   console.log('└─────────────────────────────────────────────────────────────┘\n');

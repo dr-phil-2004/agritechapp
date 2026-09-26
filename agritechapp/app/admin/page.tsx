@@ -1,10 +1,52 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, UserCheck } from 'lucide-react';
+
+interface AdminStats {
+  signalements_en_cours: number;
+  alertes_envoyees: number;
+  producteurs_prevenus: number;
+  delai_moyen_min: number | null;
+}
 
 export default function AdminPage() {
   const router = useRouter();
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/admin/stats')
+      .then((res) => res.json())
+      .then((data: AdminStats) => {
+        setStats(data);
+      })
+      .catch(() => {
+        // Silencieux en cas d'erreur, on garde les valeurs à 0
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
+
+  const StatValue = ({ value, unit }: { value: number | null; unit?: string }) => {
+    if (loading) {
+      return (
+        <div
+          className="h-9 w-16 bg-current opacity-20 rounded animate-pulse"
+          aria-label="Chargement…"
+        />
+      );
+    }
+    const display = value === null ? '—' : String(value);
+    return (
+      <span>
+        {display}
+        {unit && value !== null ? ` ${unit}` : ''}
+      </span>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -28,41 +70,66 @@ export default function AdminPage() {
               Déconnexion
             </button>
           </div>
-          
+
           <p className="text-gray-600 mb-6">
             Tableau de bord de la direction départementale.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-green-50 p-4 rounded-lg">
-              <div className="text-3xl font-bold text-green-800">0</div>
+              <div className="text-3xl font-bold text-green-800">
+                <StatValue value={stats?.signalements_en_cours ?? null} />
+              </div>
               <div className="text-sm text-green-600">Signalements en cours</div>
             </div>
-            
+
             <div className="bg-blue-50 p-4 rounded-lg">
-              <div className="text-3xl font-bold text-blue-800">0</div>
+              <div className="text-3xl font-bold text-blue-800">
+                <StatValue value={stats?.alertes_envoyees ?? null} />
+              </div>
               <div className="text-sm text-blue-600">Alertes envoyées</div>
             </div>
-            
+
             <div className="bg-purple-50 p-4 rounded-lg">
-              <div className="text-3xl font-bold text-purple-800">0</div>
+              <div className="text-3xl font-bold text-purple-800">
+                <StatValue value={stats?.producteurs_prevenus ?? null} />
+              </div>
               <div className="text-sm text-purple-600">Producteurs prévenus</div>
             </div>
-            
+
             <div className="bg-orange-50 p-4 rounded-lg">
-              <div className="text-3xl font-bold text-orange-800">0 min</div>
+              <div className="text-3xl font-bold text-orange-800">
+                <StatValue
+                  value={stats?.delai_moyen_min ?? null}
+                  unit="min"
+                />
+              </div>
               <div className="text-sm text-orange-600">Délai moyen alerte</div>
             </div>
           </div>
 
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button className="bg-gray-600 text-white p-4 rounded-lg hover:bg-gray-700 transition-colors">
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button
+              onClick={() => router.push('/admin/inscrire-conseiller')}
+              className="bg-indigo-600 text-white p-4 rounded-lg hover:bg-indigo-700 transition-colors flex flex-col items-center gap-2 focus:outline-none focus:ring-4 focus:ring-indigo-300"
+              aria-label="Inscrire un nouveau conseiller agricole"
+            >
+              <UserCheck className="w-6 h-6" aria-hidden="true" />
+              <div className="font-semibold">Inscrire un conseiller</div>
+              <div className="text-sm opacity-90">Créer un compte ATDA</div>
+            </button>
+
+            <button
+              onClick={() => router.push('/admin/contenus')}
+              className="bg-teal-600 text-white p-4 rounded-lg hover:bg-teal-700 transition-colors flex flex-col items-center gap-2 focus:outline-none focus:ring-4 focus:ring-teal-300"
+              aria-label="Gérer les fiches ravageurs et réglementaires"
+            >
               <div className="font-semibold">Gestion des contenus</div>
               <div className="text-sm opacity-90">Fiches ravageurs, réglementaires</div>
             </button>
-            
-            <button className="bg-gray-600 text-white p-4 rounded-lg hover:bg-gray-700 transition-colors">
-              <div className="font-semibold">Recettes de l'État</div>
+
+            <button className="bg-gray-600 text-white p-4 rounded-lg hover:bg-gray-700 transition-colors focus:outline-none focus:ring-4 focus:ring-gray-400">
+              <div className="font-semibold">Recettes de l&apos;État</div>
               <div className="text-sm opacity-90">Ventes déclarées</div>
             </button>
           </div>
