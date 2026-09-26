@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Users, ShoppingCart } from 'lucide-react';
 
 export default function AcheteurPage() {
   const router = useRouter();
@@ -18,9 +18,7 @@ export default function AcheteurPage() {
             >
               <ArrowLeft className="w-5 h-5" aria-hidden="true" />
             </button>
-            <h1 className="text-2xl font-bold text-purple-800 flex-1">
-              Espace Acheteur
-            </h1>
+            <h1 className="text-2xl font-bold text-purple-800 flex-1">Espace Acheteur</h1>
             <button
               onClick={() => router.push('/')}
               className="text-red-600 hover:text-red-700"
@@ -28,22 +26,35 @@ export default function AcheteurPage() {
               Déconnexion
             </button>
           </div>
-          
-          <p className="text-gray-600 mb-6">
-            Bienvenue dans votre espace acheteur. Consultez les annonces et contactez les producteurs.
-          </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button className="bg-purple-600 text-white p-6 rounded-lg hover:bg-purple-700 transition-colors">
-              <div className="text-4xl mb-2">📋</div>
-              <div className="font-semibold">Annonces</div>
-              <div className="text-sm opacity-90">Voir les annonces</div>
+          <p className="text-gray-600 mb-6">Publiez vos demandes d&apos;achat et contactez les producteurs.</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button
+              onClick={() => router.push('/acheteur/annonces')}
+              className="bg-purple-600 text-white p-6 rounded-lg hover:bg-purple-700 transition-colors text-left focus:outline-none focus:ring-2 focus:ring-purple-400"
+            >
+              <ClipboardList className="w-8 h-8 mb-2" aria-hidden="true" />
+              <div className="font-semibold">Mes annonces</div>
+              <div className="text-sm opacity-90">Publier et gérer vos demandes</div>
             </button>
-            
-            <button className="bg-green-600 text-white p-6 rounded-lg hover:bg-green-700 transition-colors">
-              <div className="text-4xl mb-2">📞</div>
-              <div className="font-semibold">Mes contacts</div>
-              <div className="text-sm opacity-90">Producteurs contactés</div>
+
+            <button
+              onClick={() => router.push('/acheteur/contacts')}
+              className="bg-green-600 text-white p-6 rounded-lg hover:bg-green-700 transition-colors text-left focus:outline-none focus:ring-2 focus:ring-green-400"
+            >
+              <Users className="w-8 h-8 mb-2" aria-hidden="true" />
+              <div className="font-semibold">Producteurs contactés</div>
+              <div className="text-sm opacity-90">Réponses reçues</div>
+            </button>
+
+            <button
+              onClick={() => router.push('/acheteur/commandes')}
+              className="bg-blue-600 text-white p-6 rounded-lg hover:bg-blue-700 transition-colors text-left focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              <ShoppingCart className="w-8 h-8 mb-2" aria-hidden="true" />
+              <div className="font-semibold">Mes commandes</div>
+              <div className="text-sm opacity-90">Livraisons et paiements</div>
             </button>
           </div>
         </div>
