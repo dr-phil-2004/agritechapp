@@ -40,14 +40,40 @@ function phoneToEmail(phone: string): string {
   return `${phone.replace(/[^0-9]/g, '')}@agri.bj`;
 }
 
-// Créer (ou ignorer si déjà existant) un compte Supabase Auth
+// Cache des utilisateurs Supabase Auth (chargé une seule fois si nécessaire)
+let _existingUsers: { id: string; email?: string }[] | null = null;
+
+async function getExistingUsers() {
+  if (!_existingUsers) {
+    const { data } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+    _existingUsers = data.users;
+  }
+  return _existingUsers;
+}
+
+// Créer ou mettre à jour un compte Supabase Auth (pour un seed toujours reproductible)
 async function createAuthUser(email: string, password: string): Promise<void> {
   const { error } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
   });
-  if (error && !error.message.includes('already')) {
+
+  if (!error) return;
+
+  if (error.message.toLowerCase().includes('already')) {
+    const users = await getExistingUsers();
+    const existing = users.find((u) => u.email === email);
+    if (existing) {
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        existing.id,
+        { password, email_confirm: true }
+      );
+      if (updateError) {
+        console.warn(`Auth user update ${email}: ${updateError.message}`);
+      }
+    }
+  } else {
     console.warn(`Auth user ${email}: ${error.message}`);
   }
 }

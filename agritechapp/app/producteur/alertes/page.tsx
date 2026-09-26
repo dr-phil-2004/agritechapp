@@ -87,8 +87,16 @@ export default function AlertesProducteurPage() {
   useEffect(() => {
     chargerAlertes(true);
 
+    // Marquer toutes les alertes non lues comme vues (silencieux)
+    fetch(`/api/alertes/producteur/vu?producteur_id=${producteurId}`, { method: 'PATCH' })
+      .catch(() => {/* non critique */});
+
     // Écouter les nouvelles alertes déclenchées par le layout
-    const handleNouvelleAlerte = () => chargerAlertes(false);
+    const handleNouvelleAlerte = () => {
+      chargerAlertes(false);
+      fetch(`/api/alertes/producteur/vu?producteur_id=${producteurId}`, { method: 'PATCH' })
+        .catch(() => {});
+    };
     window.addEventListener('nouvelle-alerte', handleNouvelleAlerte);
     return () => window.removeEventListener('nouvelle-alerte', handleNouvelleAlerte);
   // eslint-disable-next-line react-hooks/exhaustive-deps

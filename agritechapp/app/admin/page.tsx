@@ -1,10 +1,52 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, UserCheck } from 'lucide-react';
+
+interface AdminStats {
+  signalements_en_cours: number;
+  alertes_envoyees: number;
+  producteurs_prevenus: number;
+  delai_moyen_min: number | null;
+}
 
 export default function AdminPage() {
   const router = useRouter();
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/admin/stats')
+      .then((res) => res.json())
+      .then((data: AdminStats) => {
+        setStats(data);
+      })
+      .catch(() => {
+        // Silencieux en cas d'erreur, on garde les valeurs à 0
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
+
+  const StatValue = ({ value, unit }: { value: number | null; unit?: string }) => {
+    if (loading) {
+      return (
+        <div
+          className="h-9 w-16 bg-current opacity-20 rounded animate-pulse"
+          aria-label="Chargement…"
+        />
+      );
+    }
+    const display = value === null ? '—' : String(value);
+    return (
+      <span>
+        {display}
+        {unit && value !== null ? ` ${unit}` : ''}
+      </span>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -28,29 +70,40 @@ export default function AdminPage() {
               Déconnexion
             </button>
           </div>
-          
+
           <p className="text-gray-600 mb-6">
             Tableau de bord de la direction départementale.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-green-50 p-4 rounded-lg">
-              <div className="text-3xl font-bold text-green-800">0</div>
+              <div className="text-3xl font-bold text-green-800">
+                <StatValue value={stats?.signalements_en_cours ?? null} />
+              </div>
               <div className="text-sm text-green-600">Signalements en cours</div>
             </div>
-            
+
             <div className="bg-blue-50 p-4 rounded-lg">
-              <div className="text-3xl font-bold text-blue-800">0</div>
+              <div className="text-3xl font-bold text-blue-800">
+                <StatValue value={stats?.alertes_envoyees ?? null} />
+              </div>
               <div className="text-sm text-blue-600">Alertes envoyées</div>
             </div>
-            
+
             <div className="bg-purple-50 p-4 rounded-lg">
-              <div className="text-3xl font-bold text-purple-800">0</div>
+              <div className="text-3xl font-bold text-purple-800">
+                <StatValue value={stats?.producteurs_prevenus ?? null} />
+              </div>
               <div className="text-sm text-purple-600">Producteurs prévenus</div>
             </div>
-            
+
             <div className="bg-orange-50 p-4 rounded-lg">
-              <div className="text-3xl font-bold text-orange-800">0 min</div>
+              <div className="text-3xl font-bold text-orange-800">
+                <StatValue
+                  value={stats?.delai_moyen_min ?? null}
+                  unit="min"
+                />
+              </div>
               <div className="text-sm text-orange-600">Délai moyen alerte</div>
             </div>
           </div>

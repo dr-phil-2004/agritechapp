@@ -55,7 +55,7 @@ export default function InscrireProducteurPage() {
     try {
       const normalizedPhone = (() => {
         const digits = telephone.replace(/\D/g, '');
-        return digits.length === 8 ? `229${digits}` : digits;
+        return digits.length === 8 ? `01${digits}` : digits;
       })();
 
       const res = await fetch('/api/auth/register-producteur', {
@@ -145,10 +145,10 @@ export default function InscrireProducteurPage() {
             {/* Téléphone */}
             <div className="bg-white rounded-2xl shadow-sm p-5">
               <label htmlFor="tel" className="block text-sm font-semibold text-gray-700 mb-1">Numéro de téléphone *</label>
-              <p className="text-xs text-gray-400 mb-2">8 chiffres sans le +229</p>
+              <p className="text-xs text-gray-400 mb-2">10 chiffres (ex : 01 97 00 00 00)</p>
               <input
                 id="tel" type="tel" value={telephone} onChange={(e) => setTelephone(e.target.value)}
-                placeholder="97 XX XX XX" inputMode="numeric"
+                placeholder="01 XX XX XX XX" inputMode="numeric"
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl text-xl tracking-widest text-center focus:ring-2 focus:ring-green-400"
                 required
               />
