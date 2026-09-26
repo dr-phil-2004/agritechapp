@@ -4,17 +4,19 @@ import { triggerZoneAlert } from '../../../src/domains/alertes';
 // POST /api/alertes — déclenche une alerte de zone depuis un signalement confirmé
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json() as { signalement_id?: unknown; conseiller_id?: unknown; recommandation?: unknown };
+    const body = await request.json() as { signalement_id?: unknown; conseiller_id?: unknown; recommandation?: unknown; audio_url?: unknown; audio_langue?: unknown };
 
     const signalementId = typeof body.signalement_id === 'number' ? body.signalement_id : NaN;
     const conseillerId = typeof body.conseiller_id === 'number' ? body.conseiller_id : 1; // 1 = Serge (démo)
     const recommandation = typeof body.recommandation === 'string' ? body.recommandation.trim() || undefined : undefined;
+    const audioUrl = typeof body.audio_url === 'string' ? body.audio_url.trim() || undefined : undefined;
+    const audioLangue = typeof body.audio_langue === 'string' ? body.audio_langue.trim() || undefined : undefined;
 
     if (isNaN(signalementId)) {
       return NextResponse.json({ success: false, error: 'signalement_id requis' }, { status: 400 });
     }
 
-    const result = await triggerZoneAlert(signalementId, conseillerId, recommandation);
+    const result = await triggerZoneAlert(signalementId, conseillerId, recommandation, audioUrl, audioLangue);
 
     if (result.success) {
       return NextResponse.json(result);
