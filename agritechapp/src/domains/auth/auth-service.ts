@@ -15,7 +15,7 @@ export interface AuthResult {
 
 // Convertir un numéro de téléphone en identifiant technique pour Supabase
 function phoneToEmail(phone: string): string {
-  // Format: 22901XXXXXXXX@producteurs.local
+  // Format: 01XXXXXXXX@agri.bj
   const cleanedPhone = phone.replace(/[^0-9]/g, '');
   return `${cleanedPhone}@agri.bj`;
 }
@@ -247,6 +247,45 @@ export class AuthService {
       success: true,
       user: newProfile[0],
     };
+  }
+
+  // Créer un compte conseiller (admin uniquement) — envoie un email d'invitation
+  async createConseillerAccount(
+    email: string,
+    nom: string,
+    langue: string,
+    communeId: number | null,
+    inscritPar: number
+  ): Promise<AuthResult> {
+    // Vérifier si l'email est déjà utilisé
+    const existing = await db.select().from(profils).where(
+      eq(profils.telephone, email)
+    );
+    if (existing.length > 0) {
+      return { success: false, error: 'Cet e-mail est déjà utilisé' };
+    }
+
+    // Envoyer une invitation par email (le conseiller définit son propre mot de passe)
+    const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      data: { nom, langue },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    // Créer le profil avec role 'conseiller', email stocké dans telephone
+    const newProfile = await db.insert(profils).values({
+      role: 'conseiller',
+      nom,
+      telephone: email,
+      langue,
+      a_smartphone: true,
+      commune_id: communeId,
+      inscrit_par: inscritPar,
+    }).returning();
+
+    return { success: true, user: newProfile[0] };
   }
 
   // Réinitialiser le code d'un producteur (conseiller uniquement)

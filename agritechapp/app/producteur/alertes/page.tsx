@@ -15,6 +15,8 @@ interface AlerteItem {
   ravageur_nom: string | null;
   ravageur_pictogramme: string | null;
   recommandation: string | null;
+  audio_url: string | null;
+  audio_langue: string | null;
   envoi_canal: string;
   envoi_statut: string;
   envoi_sent_at: string | null;
@@ -192,7 +194,29 @@ export default function AlertesProducteurPage() {
                     />
                   )}
 
-                  {/* Recommandation du conseiller */}
+                  {/* Note vocale du conseiller */}
+                  {a.audio_url && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl mb-3">
+                      <p className="text-xs font-semibold text-amber-800 flex items-center gap-1.5 mb-2">
+                        <span aria-hidden="true">🔊</span>
+                        Message vocal du conseiller
+                        {a.audio_langue && a.audio_langue !== 'fr' && (
+                          <span className="ml-1 px-1.5 py-0.5 bg-amber-200 rounded text-amber-900 uppercase tracking-wide">
+                            {a.audio_langue}
+                          </span>
+                        )}
+                      </p>
+                      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                      <audio
+                        src={a.audio_url}
+                        controls
+                        className="w-full h-10"
+                        aria-label={`Message vocal du conseiller${a.audio_langue ? ` en ${a.audio_langue}` : ''}`}
+                      />
+                    </div>
+                  )}
+
+                  {/* Recommandation écrite du conseiller */}
                   {a.recommandation && (
                     <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800 mb-3">
                       <p className="font-semibold mb-1">Recommandation du conseiller :</p>
