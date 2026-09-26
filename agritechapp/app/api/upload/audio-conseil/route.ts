@@ -1,28 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../src/infrastructure/supabase/admin-client';
 
+const LANGUES = ['fr', 'fon', 'bariba'] as const;
+const MAX_AUDIO_BYTES = 5 * 1024 * 1024; // 5 Mo : une note vocale Opus de quelques minutes
+const TYPES_AUTORISES: Record<string, string> = {
+  'audio/webm': 'webm',
+  'audio/ogg': 'ogg',
+  'audio/opus': 'ogg',
+};
+
+function extensionPour(mimeType: string): string | null {
+  const base = mimeType.split(';')[0].trim().toLowerCase();
+  return TYPES_AUTORISES[base] ?? null;
+}
+
 // POST /api/upload/audio-conseil
 // Body : multipart/form-data  { audio: File, langue: string }
 // Retourne : { success: true, url: string }
 export async function POST(request: NextRequest) {
   try {
+    const contentLength = Number(request.headers.get('content-length') ?? '0');
+    if (contentLength > MAX_AUDIO_BYTES) {
+      return NextResponse.json(
+        { success: false, error: 'Note vocale trop volumineuse (5 Mo maximum)' },
+        { status: 413 }
+      );
+    }
+
     const formData = await request.formData();
     const audio = formData.get('audio') as File | null;
-    const langue = (formData.get('langue') as string | null) ?? 'fr';
+    const langueBrute = (formData.get('langue') as string | null) ?? 'fr';
+    const langue = (LANGUES as readonly string[]).includes(langueBrute) ? langueBrute : 'fr';
 
     if (!audio || audio.size === 0) {
       return NextResponse.json({ success: false, error: 'Fichier audio manquant' }, { status: 400 });
     }
 
+    if (audio.size > MAX_AUDIO_BYTES) {
+      return NextResponse.json(
+        { success: false, error: 'Note vocale trop volumineuse (5 Mo maximum)' },
+        { status: 413 }
+      );
+    }
+
+    const ext = extensionPour(audio.type);
+    if (!ext) {
+      return NextResponse.json(
+        { success: false, error: 'Format audio non supporté' },
+        { status: 415 }
+      );
+    }
+
     const bytes = await audio.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    const ext = audio.type.includes('ogg') ? 'ogg' : 'webm';
     const filename = `conseiller/${Date.now()}-${langue}.${ext}`;
 
     const { error } = await supabaseAdmin.storage
       .from('notes-vocales')
       .upload(filename, buffer, {
-        contentType: audio.type || 'audio/webm',
+        contentType: audio.type,
         upsert: false,
       });
 

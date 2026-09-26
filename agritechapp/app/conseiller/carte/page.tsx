@@ -162,12 +162,20 @@ function QualificationPanel({
   const [audioBlobUrl, setAudioBlobUrl] = useState<string | null>(null);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioBlobUrlRef = useRef<string | null>(null);
+  const unmountedRef = useRef(false);
 
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (unmountedRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      streamRef.current = stream;
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : 'audio/webm';
@@ -175,10 +183,14 @@ function QualificationPanel({
       chunksRef.current = [];
       mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       mr.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: mimeType });
-        setAudioBlob(blob);
-        setAudioBlobUrl(URL.createObjectURL(blob));
         stream.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        if (unmountedRef.current) return;
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        audioBlobUrlRef.current = url;
+        setAudioBlob(blob);
+        setAudioBlobUrl(url);
       };
       mediaRecorderRef.current = mr;
       mr.start(200);
@@ -197,11 +209,25 @@ function QualificationPanel({
   };
 
   const deleteRecording = () => {
-    if (audioBlobUrl) URL.revokeObjectURL(audioBlobUrl);
+    if (audioBlobUrlRef.current) URL.revokeObjectURL(audioBlobUrlRef.current);
+    audioBlobUrlRef.current = null;
     setAudioBlob(null);
     setAudioBlobUrl(null);
     setRecordingSeconds(0);
   };
+
+  useEffect(() => {
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop();
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      if (audioBlobUrlRef.current) URL.revokeObjectURL(audioBlobUrlRef.current);
+      audioBlobUrlRef.current = null;
+    };
+  }, []);
 
   const handleConfirmer = async () => {
     setLoading(true); setError(null);
@@ -228,10 +254,15 @@ function QualificationPanel({
         fd.append('audio', audioBlob, `note-${Date.now()}.webm`);
         fd.append('langue', audioLangue);
         const uploadRes = await fetch('/api/upload/audio-conseil', { method: 'POST', body: fd });
-        const uploadData = await uploadRes.json() as { success: boolean; url?: string };
-        if (uploadData.success && uploadData.url) {
-          uploadedAudioUrl = uploadData.url;
+        const uploadData = await uploadRes.json().catch(() => null) as { success?: boolean; url?: string; error?: string } | null;
+        if (!uploadRes.ok || !uploadData?.success || !uploadData.url) {
+          throw new Error(
+            uploadData?.error
+              ? `Envoi de la note vocale impossible : ${uploadData.error}`
+              : 'Envoi de la note vocale impossible. Réessayez ou supprimez l\'enregistrement.'
+          );
         }
+        uploadedAudioUrl = uploadData.url;
       }
 
       // 3. Déclencher l'alerte de zone

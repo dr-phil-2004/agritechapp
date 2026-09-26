@@ -1,6 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { triggerZoneAlert } from '../../../src/domains/alertes';
 
+const LANGUES_AUDIO = ['fr', 'fon', 'bariba'];
+
+// Seuls les fichiers déposés dans le Storage du projet peuvent être diffusés aux producteurs
+function estUrlStockageInterne(url: string): boolean {
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!base) return false;
+  try {
+    const parsed = new URL(url);
+    const parsedBase = new URL(base);
+    return (
+      parsed.protocol === 'https:' &&
+      parsed.host === parsedBase.host &&
+      parsed.pathname.startsWith('/storage/v1/object/public/notes-vocales/')
+    );
+  } catch {
+    return false;
+  }
+}
+
 // POST /api/alertes — déclenche une alerte de zone depuis un signalement confirmé
 export async function POST(request: NextRequest) {
   try {
@@ -14,6 +33,14 @@ export async function POST(request: NextRequest) {
 
     if (isNaN(signalementId)) {
       return NextResponse.json({ success: false, error: 'signalement_id requis' }, { status: 400 });
+    }
+
+    if (audioUrl && !estUrlStockageInterne(audioUrl)) {
+      return NextResponse.json({ success: false, error: 'audio_url invalide' }, { status: 400 });
+    }
+
+    if (audioLangue && !LANGUES_AUDIO.includes(audioLangue)) {
+      return NextResponse.json({ success: false, error: 'audio_langue invalide' }, { status: 400 });
     }
 
     const result = await triggerZoneAlert(signalementId, conseillerId, recommandation, audioUrl, audioLangue);
