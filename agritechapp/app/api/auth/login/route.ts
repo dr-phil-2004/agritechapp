@@ -29,11 +29,16 @@ export async function POST(request: NextRequest) {
       );
     }
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('Login error:', msg);
-    return NextResponse.json(
-      { error: msg },
-      { status: 500 }
-    );
+    const e = error as any;
+    const details = {
+      message: e?.message ?? String(error),
+      code: e?.code,
+      detail: e?.detail,
+      hint: e?.hint,
+      dbUrl: process.env.DATABASE_URL ? process.env.DATABASE_URL.replace(/:([^:@]+)@/, ':***@') : 'NOT SET',
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'NOT SET',
+    };
+    console.error('Login error:', details);
+    return NextResponse.json({ error: JSON.stringify(details) }, { status: 500 });
   }
 }
