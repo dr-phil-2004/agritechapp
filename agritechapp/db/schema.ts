@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, boolean, integer, varchar, index } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, timestamp, boolean, integer, varchar, index, type AnyPgColumn } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 // Communes avec limites géographiques
@@ -21,7 +21,7 @@ export const profils = pgTable('profils', {
   a_smartphone: boolean('a_smartphone').notNull().default(true),
   commune_id: integer('commune_id').references(() => communes.id),
   position: text('position'), // Stocké comme GeoJSON text, sera converti en geography(Point, 4326)
-  inscrit_par: integer('inscrit_par').references(() => profils.id),
+  inscrit_par: integer('inscrit_par').references((): AnyPgColumn => profils.id),
   created_at: timestamp('created_at').defaultNow(),
 }, (table) => ({
   positionIdx: index('profils_position_idx').using('gist', sql`ST_GeomFromText(${table.position})`),
