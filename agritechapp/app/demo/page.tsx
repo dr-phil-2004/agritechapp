@@ -1,7 +1,6 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { AuthService } from '@/domains/auth/auth-service';
 
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'demo123';
 
@@ -11,7 +10,8 @@ const personas = [
     name: 'Bio',
     role: 'producteur',
     description: 'Producteur smartphone, N\'Dali, parle bariba',
-    phone: '+22997012345',
+    phone: '22941000001',
+    code: '123456',
     color: 'bg-green-600',
   },
   {
@@ -19,7 +19,8 @@ const personas = [
     name: 'Adjara',
     role: 'producteur',
     description: 'Producteur téléphone basique, près de N\'Dali, parle bariba',
-    phone: '+22997012346',
+    phone: '22941000002',
+    code: '000000',
     color: 'bg-orange-600',
   },
   {
@@ -28,6 +29,7 @@ const personas = [
     role: 'conseiller',
     description: 'Conseiller agricole, Parakou',
     email: 'serge@agriveille.bj',
+    password: 'Conseil1',
     color: 'bg-blue-600',
   },
   {
@@ -35,7 +37,8 @@ const personas = [
     name: 'Mme Houénou',
     role: 'acheteur',
     description: 'Commerçante de céréales, Parakou',
-    phone: '+22997012348',
+    phone: '22941000003',
+    code: '123456',
     color: 'bg-purple-600',
   },
   {
@@ -44,54 +47,35 @@ const personas = [
     role: 'admin',
     description: 'Direction départementale',
     email: 'admin@agriveille.bj',
+    password: 'Admin2026',
     color: 'bg-gray-600',
   },
 ];
 
 export default function DemoPage() {
   const router = useRouter();
-  const authService = new AuthService();
 
-  const handlePersonaLogin = async (persona: typeof personas[0]) => {
-    let result;
-    
-    if (persona.role === 'conseiller' || persona.role === 'admin') {
-      result = await authService.loginWithEmailPassword(
-        persona.email,
-        DEMO_PASSWORD
-      );
-    } else {
-      result = await authService.loginWithPhoneCode(
-        persona.phone,
-        DEMO_PASSWORD
-      );
-    }
-
-    if (result.success) {
-      // Rediriger selon le rôle
-      switch (persona.role) {
-        case 'producteur':
-          router.push('/producteur');
-          break;
-        case 'conseiller':
-          router.push('/conseiller');
-          break;
-        case 'acheteur':
-          router.push('/acheteur');
-          break;
-        case 'admin':
-          router.push('/admin');
-          break;
-      }
-    } else {
-      console.error('Demo login failed:', result.error);
+  const handlePersonaLogin = (persona: typeof personas[0]) => {
+    // Rediriger directement selon le rôle pour la démo
+    switch (persona.role) {
+      case 'producteur':
+        router.push('/producteur');
+        break;
+      case 'conseiller':
+        router.push('/conseiller');
+        break;
+      case 'acheteur':
+        router.push('/acheteur');
+        break;
+      case 'admin':
+        router.push('/admin');
+        break;
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 p-6">
       <div className="max-w-4xl mx-auto">
-        {/* Bannière de données fictives */}
         <div className="bg-yellow-100 border-l-4 border-yellow-500 p-4 mb-6">
           <div className="flex items-center">
             <span className="text-2xl mr-3" aria-hidden="true">⚠️</span>
@@ -133,12 +117,11 @@ export default function DemoPage() {
                   </div>
                 </div>
                 <p className="text-sm opacity-90">{persona.description}</p>
-                <div className="mt-4 pt-4 border-t border-white/20">
-                  <p className="text-xs font-mono">
-                    {persona.role === 'conseiller' || persona.role === 'admin' 
-                      ? persona.email 
-                      : persona.phone}
-                  </p>
+                <div className="mt-4 pt-4 border-t border-white/20 text-xs font-mono space-y-0.5">
+                  {'email' in persona
+                    ? <><p>{persona.email}</p><p>Mot de passe : {(persona as {password?: string}).password}</p></>
+                    : <><p>N° {(persona as {phone?: string}).phone}</p><p>Code : {(persona as {code?: string}).code}</p></>
+                  }
                 </div>
               </button>
             ))}
@@ -155,7 +138,7 @@ export default function DemoPage() {
         </div>
 
         <div className="mt-6 text-center text-gray-500 text-sm">
-          <p>Identifiants de démo : tous les personas utilisent le mot de passe "{DEMO_PASSWORD}"</p>
+          <p>Mode démo : accès direct aux espaces sans authentification</p>
         </div>
       </div>
     </div>

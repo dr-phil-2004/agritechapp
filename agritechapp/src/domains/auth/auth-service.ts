@@ -1,8 +1,8 @@
-import { db } from '@/db';
-import { profils, tentatives_connexion } from '@/db/schema';
+import { db } from '../../../db';
+import { profils, tentatives_connexion } from '../../../db/schema';
 import { eq, and, gt } from 'drizzle-orm';
-import { supabase } from '@/infrastructure/supabase/client';
-import { supabaseAdmin } from '@/infrastructure/supabase/admin-client';
+import { supabase } from '../../infrastructure/supabase/client';
+import { supabaseAdmin } from '../../infrastructure/supabase/admin-client';
 
 export type Role = 'producteur' | 'conseiller' | 'acheteur' | 'admin';
 
@@ -17,7 +17,7 @@ export interface AuthResult {
 function phoneToEmail(phone: string): string {
   // Format: 22901XXXXXXXX@producteurs.local
   const cleanedPhone = phone.replace(/[^0-9]/g, '');
-  return `${cleanedPhone}@producteurs.local`;
+  return `${cleanedPhone}@agri.bj`;
 }
 
 export class AuthService {
@@ -151,9 +151,9 @@ export class AuthService {
     nom: string,
     langue: string,
     aSmartphone: boolean,
-    communeId: number,
-    position: string,
-    inscritPar: number
+    communeId: number | null,
+    position: string | null,
+    inscritPar: number | null
   ): Promise<AuthResult> {
     // Vérifier si le numéro existe déjà
     const existing = await db.select().from(profils).where(
@@ -276,7 +276,7 @@ export class AuthService {
       };
     }
 
-    const user = users.find(u => u.email === email);
+    const user = users.find((u: any) => u.email === email);
     if (!user) {
       return {
         success: false,

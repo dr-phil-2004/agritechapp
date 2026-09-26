@@ -1,27 +1,28 @@
 'use client';
 
-import { AuthService } from '@/domains/auth/auth-service';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
 
 export default function AdminPage() {
   const router = useRouter();
-  const authService = new AuthService();
-
-  const handleLogout = async () => {
-    await authService.logout();
-    router.push('/');
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto">
         <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-800">
+          <div className="flex items-center gap-3 mb-6">
+            <button
+              onClick={() => router.back()}
+              className="p-2 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400"
+              aria-label="Retour"
+            >
+              <ArrowLeft className="w-5 h-5" aria-hidden="true" />
+            </button>
+            <h1 className="text-2xl font-bold text-gray-800 flex-1">
               Espace Admin
             </h1>
             <button
-              onClick={handleLogout}
+              onClick={() => router.push('/')}
               className="text-red-600 hover:text-red-700"
             >
               Déconnexion
