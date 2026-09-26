@@ -108,29 +108,18 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button
-              onClick={() => router.push('/admin/inscrire-conseiller')}
-              className="bg-indigo-600 text-white p-4 rounded-lg hover:bg-indigo-700 transition-colors flex flex-col items-center gap-2 focus:outline-none focus:ring-4 focus:ring-indigo-300"
-              aria-label="Inscrire un nouveau conseiller agricole"
-            >
-              <UserCheck className="w-6 h-6" aria-hidden="true" />
-              <div className="font-semibold">Inscrire un conseiller</div>
-              <div className="text-sm opacity-90">Créer un compte ATDA</div>
-            </button>
-
-            <button
-              onClick={() => router.push('/admin/contenus')}
-              className="bg-teal-600 text-white p-4 rounded-lg hover:bg-teal-700 transition-colors flex flex-col items-center gap-2 focus:outline-none focus:ring-4 focus:ring-teal-300"
-              aria-label="Gérer les fiches ravageurs et réglementaires"
-            >
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button className="bg-gray-600 text-white p-4 rounded-lg hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400">
               <div className="font-semibold">Gestion des contenus</div>
               <div className="text-sm opacity-90">Fiches ravageurs, réglementaires</div>
             </button>
 
-            <button className="bg-gray-600 text-white p-4 rounded-lg hover:bg-gray-700 transition-colors focus:outline-none focus:ring-4 focus:ring-gray-400">
+            <button
+              onClick={() => router.push('/admin/recettes')}
+              className="bg-gray-600 text-white p-4 rounded-lg hover:bg-gray-700 transition-colors text-left focus:outline-none focus:ring-2 focus:ring-gray-400"
+            >
               <div className="font-semibold">Recettes de l&apos;État</div>
-              <div className="text-sm opacity-90">Ventes déclarées</div>
+              <div className="text-sm opacity-90">Ventes déclarées et redevances</div>
             </button>
           </div>
         </div>

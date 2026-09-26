@@ -162,7 +162,7 @@ async function seed() {
 
   // ── 0. Nettoyage des tables (pour un seed reproductible) ─────────────────────
   console.log('Nettoyage des tables...');
-  await db.execute(sql`TRUNCATE TABLE envois, alertes, signalements, annonces, ventes_declarees, contenus_audio, contenus, profils, ravageurs, communes RESTART IDENTITY CASCADE`);
+  await db.execute(sql`TRUNCATE TABLE envois, alertes, signalements, commandes, contacts_annonce, ventes_declarees, annonces, contenus_audio, contenus, profils, ravageurs, communes RESTART IDENTITY CASCADE`);
 
   // ── 0b. Buckets Supabase Storage ──────────────────────────────────────────────
   console.log('Création des buckets Storage...');
@@ -176,9 +176,9 @@ async function seed() {
   // ── 1. Comptes Supabase Auth ────────────────────────────────────────────────
   console.log('Création des comptes Supabase Auth...');
   for (const p of PERSONAS) {
-    if ('phone' in p) {
+    if ('phone' in p && p.phone && p.code) {
       await createAuthUser(phoneToEmail(p.phone), p.code);
-    } else {
+    } else if ('email' in p && p.email && p.password) {
       await createAuthUser(p.email, p.password);
     }
   }
@@ -334,41 +334,64 @@ async function seed() {
     }
   }
 
-  // ── 7. Annonces (~20) ─────────────────────────────────────────────────────
-  console.log('Création des annonces...');
-  const produits = ['maïs', 'soja', 'haricot'];
-
-  for (let i = 0; i < 20; i++) {
-    const producteurs = await db.select().from(schema.profils).where(
-      eq(schema.profils.role, 'producteur')
-    ).limit(1).offset(Math.floor(random() * 50));
-
-    if (producteurs.length === 0) continue;
-
-    await db.insert(schema.annonces).values({
-      producteur_id: producteurs[0].id,
-      produit: produits[Math.floor(random() * produits.length)],
-      quantite: Math.floor(random() * 500) + 50,
-      prix: Math.floor(random() * 200) + 100,
-      statut: random() > 0.7 ? 'vendue' : 'active',
-    });
-  }
-
-  // ── 8. Ventes déclarées (~15) ──────────────────────────────────────────────
-  console.log('Création des ventes déclarées...');
-  const annonces = await db.select().from(schema.annonces).limit(15);
-
-  for (const annonce of annonces) {
-    const montant = annonce.quantite * annonce.prix;
-    const redevance = Math.floor(montant * 0.01);
-
-    await db.insert(schema.ventes_declarees).values({
-      annonce_id: annonce.id,
+  // ── 7. Annonces d'achat (publiées par Mme Houénou) ───────────────────────
+  console.log('Création des annonces d\'achat...');
+  const annonceData = [
+    {
       acheteur_id: acheteuse[0].id,
-      montant,
-      redevance,
-      numero_recu: `REC-${Date.now()}-${Math.floor(random() * 1000)}`,
-    });
+      produit: 'Maïs',
+      description: 'Maïs sec, bonne qualité, sac de 100 kg minimum',
+      quantite: 500,
+      unite: 'kg',
+      prix: 150,
+      statut: 'active' as const,
+    },
+    {
+      acheteur_id: acheteuse[0].id,
+      produit: 'Soja',
+      description: 'Soja décortiqué pour transformation',
+      quantite: 200,
+      unite: 'kg',
+      prix: 280,
+      statut: 'active' as const,
+    },
+  ];
+  const insertedAnnonces = await db.insert(schema.annonces).values(annonceData).returning();
+
+  // ── 8. Contact : Bio répond à l'annonce maïs ──────────────────────────────
+  console.log('Création des contacts et commandes de démonstration...');
+  if (insertedAnnonces.length > 0) {
+    const contact = await db.insert(schema.contacts_annonce).values({
+      annonce_id: insertedAnnonces[0].id,
+      producteur_id: bio[0].id,
+      message: 'J\'ai 300 kg de maïs sec disponibles. Intéressé.',
+      quantite_proposee: 300,
+      statut: 'accepte',
+    }).returning();
+
+    if (contact.length > 0) {
+      const commande = await db.insert(schema.commandes).values({
+        contact_id: contact[0].id,
+        annonce_id: insertedAnnonces[0].id,
+        producteur_id: bio[0].id,
+        acheteur_id: acheteuse[0].id,
+        montant: 45000, // 300 kg × 150 FCFA
+        statut: 'termine',
+        livraison_confirme_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      }).returning();
+
+      if (commande.length > 0) {
+        await db.insert(schema.ventes_declarees).values({
+          commande_id: commande[0].id,
+          annonce_id: insertedAnnonces[0].id,
+          acheteur_id: acheteuse[0].id,
+          producteur_id: bio[0].id,
+          montant: 45000,
+          redevance: 450, // 1%
+          numero_recu: 'RECV-2026-001',
+        });
+      }
+    }
   }
 
   // ── 9. Fiches réglementaires ───────────────────────────────────────────────

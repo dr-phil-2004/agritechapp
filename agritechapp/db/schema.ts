@@ -106,23 +106,51 @@ export const contenus_audio = pgTable('contenus_audio', {
   audio_url: text('audio_url').notNull(),
 });
 
-// Annonces de vente
+// Annonces d'achat (publiées par les acheteurs)
 export const annonces = pgTable('annonces', {
   id: serial('id').primaryKey(),
-  producteur_id: integer('producteur_id').references(() => profils.id).notNull(),
+  acheteur_id: integer('acheteur_id').references(() => profils.id).notNull(),
   produit: text('produit').notNull(),
+  description: text('description'),
   quantite: integer('quantite').notNull(),
-  prix: integer('prix').notNull(), // en FCFA
+  unite: text('unite').notNull().default('kg'),
+  prix: integer('prix').notNull(), // en FCFA par unité
   photo_url: text('photo_url'),
-  statut: text('statut').notNull().default('active'), // 'active', 'vendue', 'archivee'
+  statut: text('statut').notNull().default('active'), // 'active', 'completee', 'archivee'
   created_at: timestamp('created_at').defaultNow(),
+});
+
+// Contacts : un producteur répond à une annonce d'achat
+export const contacts_annonce = pgTable('contacts_annonce', {
+  id: serial('id').primaryKey(),
+  annonce_id: integer('annonce_id').references(() => annonces.id).notNull(),
+  producteur_id: integer('producteur_id').references(() => profils.id).notNull(),
+  message: text('message'),
+  quantite_proposee: integer('quantite_proposee'),
+  statut: text('statut').notNull().default('en_discussion'), // 'en_discussion', 'accepte', 'refuse'
+  created_at: timestamp('created_at').defaultNow(),
+});
+
+// Commandes : créées quand un acheteur valide une proposition de producteur
+export const commandes = pgTable('commandes', {
+  id: serial('id').primaryKey(),
+  contact_id: integer('contact_id').references(() => contacts_annonce.id).notNull(),
+  annonce_id: integer('annonce_id').references(() => annonces.id).notNull(),
+  producteur_id: integer('producteur_id').references(() => profils.id).notNull(),
+  acheteur_id: integer('acheteur_id').references(() => profils.id).notNull(),
+  montant: integer('montant').notNull(), // en FCFA
+  statut: text('statut').notNull().default('en_attente_paiement'), // 'en_attente_paiement', 'paiement_bloque', 'livraison_confirmee', 'termine'
+  created_at: timestamp('created_at').defaultNow(),
+  livraison_confirme_at: timestamp('livraison_confirme_at'),
 });
 
 // Ventes déclarées
 export const ventes_declarees = pgTable('ventes_declarees', {
   id: serial('id').primaryKey(),
+  commande_id: integer('commande_id').references(() => commandes.id),
   annonce_id: integer('annonce_id').references(() => annonces.id).notNull(),
   acheteur_id: integer('acheteur_id').references(() => profils.id).notNull(),
+  producteur_id: integer('producteur_id').references(() => profils.id),
   montant: integer('montant').notNull(), // en FCFA
   redevance: integer('redevance').notNull(), // 1% du montant
   numero_recu: text('numero_recu').notNull().unique(),
